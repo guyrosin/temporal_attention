@@ -1,0 +1,13 @@
+loguru~=0.5.3
+pandas~=1.2.4
+datasets~=1.15.1
+git+git://github.com/guyrosin/transformers.git@fillmask_pipeline_fix#egg=transformers
+tokenizers~=0.10.3
+python-dotenv~=0.15.0
+typeguard~=2.11.1
+scipy~=1.7.1
+scikit-learn~=1.0
+natsort~=7.1.1
+textsearch~=0.0.21
+jsonpickle~=2.0.0
+arrow~=1.2.0

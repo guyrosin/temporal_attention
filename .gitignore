@@ -1,0 +1,19 @@
+
+### vscode ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+**/data
+**/__pycache__
+**/logs
+**/results
+**/runs
+wandb/
+plots/
+
+*.lock
+.env
