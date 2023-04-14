@@ -23,8 +23,9 @@ def predict_time(time_to_label, fill_mask_pipeline, time_pattern, sentence):
     tokens = list(result_dict.keys())
     # Choose the token with the highest probability
     pred_token = tokens[0]
-    pred = time_to_label[time_pattern.search(pred_token).group(1) if pred_token else 0]
-    return pred
+    return time_to_label[
+        time_pattern.search(pred_token).group(1) if pred_token else 0
+    ]
 
 
 def sentence_time_prediction(

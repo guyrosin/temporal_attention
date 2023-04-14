@@ -12,7 +12,7 @@ def predict_time(sentence, fill_mask_pipelines, print_results=True):
     time_tokens = [f"<{time}>" for time in fill_mask_pipelines[0].model.config.times]
     result_dict = {}
     original_sentence = sentence
-    sentence = "[MASK] " + sentence
+    sentence = f"[MASK] {sentence}"
     for model_i, fill_mask in enumerate(fill_mask_pipelines):
         fill_result = fill_mask(sentence, targets=time_tokens, truncation=True)
         result = {res["token_str"]: res["score"] for res in fill_result}

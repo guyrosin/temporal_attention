@@ -214,41 +214,39 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
 
     @max_len_single_sentence.setter
     def max_len_single_sentence(self, value) -> int:
-        # For backward compatibility, allow to try to setup 'max_len_single_sentence'.
         if (
-            value == self.model_max_length - self.num_special_tokens_to_add(pair=False)
-            and self.verbose
+            value
+            != self.model_max_length - self.num_special_tokens_to_add(pair=False)
+            or not self.verbose
         ):
-            if not self.deprecation_warnings.get("max_len_single_sentence", False):
-                logger.warning(
-                    "Setting 'max_len_single_sentence' is now deprecated. "
-                    "This value is automatically set up."
-                )
-            self.deprecation_warnings["max_len_single_sentence"] = True
-        else:
             raise ValueError(
                 "Setting 'max_len_single_sentence' is now deprecated. "
                 "This value is automatically set up."
             )
+        if not self.deprecation_warnings.get("max_len_single_sentence", False):
+            logger.warning(
+                "Setting 'max_len_single_sentence' is now deprecated. "
+                "This value is automatically set up."
+            )
+        self.deprecation_warnings["max_len_single_sentence"] = True
 
     @max_len_sentences_pair.setter
     def max_len_sentences_pair(self, value) -> int:
-        # For backward compatibility, allow to try to setup 'max_len_sentences_pair'.
         if (
-            value == self.model_max_length - self.num_special_tokens_to_add(pair=True)
-            and self.verbose
+            value
+            != self.model_max_length - self.num_special_tokens_to_add(pair=True)
+            or not self.verbose
         ):
-            if not self.deprecation_warnings.get("max_len_sentences_pair", False):
-                logger.warning(
-                    "Setting 'max_len_sentences_pair' is now deprecated. "
-                    "This value is automatically set up."
-                )
-            self.deprecation_warnings["max_len_sentences_pair"] = True
-        else:
             raise ValueError(
                 "Setting 'max_len_sentences_pair' is now deprecated. "
                 "This value is automatically set up."
             )
+        if not self.deprecation_warnings.get("max_len_sentences_pair", False):
+            logger.warning(
+                "Setting 'max_len_sentences_pair' is now deprecated. "
+                "This value is automatically set up."
+            )
+        self.deprecation_warnings["max_len_sentences_pair"] = True
 
     def __repr__(self) -> str:
         return (
@@ -369,12 +367,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
         else:
             # Get the vocabulary from local files
             logger.info(
-                "Model name '{}' not found in model shortcut name list ({}). "
-                "Assuming '{}' is a path, a model identifier, or url to a directory containing tokenizer files.".format(
-                    pretrained_model_name_or_path,
-                    ", ".join(s3_models),
-                    pretrained_model_name_or_path,
-                )
+                f"""Model name '{pretrained_model_name_or_path}' not found in model shortcut name list ({", ".join(s3_models)}). Assuming '{pretrained_model_name_or_path}' is a path, a model identifier, or url to a directory containing tokenizer files."""
             )
 
             if os.path.isfile(pretrained_model_name_or_path) or is_remote_url(
@@ -459,13 +452,12 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                             raise error
 
                 except requests.exceptions.HTTPError as err:
-                    if "404 Client Error" in str(err):
-                        logger.debug(err)
-                        resolved_vocab_files[file_id] = None
-                    else:
+                    if "404 Client Error" not in str(err):
                         raise err
 
-        if len(unresolved_files) > 0:
+                    logger.debug(err)
+                    resolved_vocab_files[file_id] = None
+        if unresolved_files:
             logger.info(
                 f"Can't load following files from cache: {unresolved_files} and cannot check if these "
                 "files are necessary for the tokenizer to operate."
@@ -583,16 +575,15 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                     if config_tokenizer_class is None:
                         config_tokenizer_class = config_tokenizer_class_fast
 
-        if config_tokenizer_class is not None:
-            if cls.__name__.replace("Fast", "") != config_tokenizer_class.replace(
-                "Fast", ""
-            ):
-                logger.warning(
-                    "The tokenizer class you load from this checkpoint is not the same type as the class this function is called from. "
-                    "It may result in unexpected tokenization. \n"
-                    f"The tokenizer class you load from this checkpoint is '{config_tokenizer_class}'. \n"
-                    f"The class this function is called from is '{cls.__name__}'."
-                )
+        if config_tokenizer_class is not None and cls.__name__.replace(
+            "Fast", ""
+        ) != config_tokenizer_class.replace("Fast", ""):
+            logger.warning(
+                "The tokenizer class you load from this checkpoint is not the same type as the class this function is called from. "
+                "It may result in unexpected tokenization. \n"
+                f"The tokenizer class you load from this checkpoint is '{config_tokenizer_class}'. \n"
+                f"The class this function is called from is '{cls.__name__}'."
+            )
 
         # Update with newly provided kwargs
         init_kwargs.update(kwargs)
@@ -607,7 +598,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                 obj.pop("__type")
                 return AddedToken(**obj)
             elif isinstance(obj, (list, tuple)):
-                return list(convert_added_tokens(o) for o in obj)
+                return [convert_added_tokens(o) for o in obj]
             elif isinstance(obj, dict):
                 return {k: convert_added_tokens(v) for k, v in obj.items()}
             return obj
@@ -708,9 +699,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                     )
 
                 # Safe to call on a tokenizer fast even if token already there.
-                tokenizer.add_tokens(
-                    token, special_tokens=bool(token in special_tokens)
-                )
+                tokenizer.add_tokens(token, special_tokens=token in special_tokens)
 
         # Check all our special tokens are registered as "no split" token (we don't cut them) and are in the vocab
         added_tokens = tokenizer.sanitize_special_tokens()
@@ -766,12 +755,15 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
 
         special_tokens_map_file = os.path.join(
             save_directory,
-            (filename_prefix + "-" if filename_prefix else "")
-            + SPECIAL_TOKENS_MAP_FILE,
+            (
+                (f"{filename_prefix}-" if filename_prefix else "")
+                + SPECIAL_TOKENS_MAP_FILE
+            ),
         )
         tokenizer_config_file = os.path.join(
             save_directory,
-            (filename_prefix + "-" if filename_prefix else "") + TOKENIZER_CONFIG_FILE,
+            (f"{filename_prefix}-" if filename_prefix else "")
+            + TOKENIZER_CONFIG_FILE,
         )
 
         tokenizer_config = copy.deepcopy(self.init_kwargs)
@@ -788,9 +780,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                     out["__type"] = "AddedToken"
                 return out
             elif isinstance(obj, (list, tuple)):
-                return list(
-                    convert_added_tokens(o, add_type_field=add_type_field) for o in obj
-                )
+                return [convert_added_tokens(o, add_type_field=add_type_field) for o in obj]
             elif isinstance(obj, dict):
                 return {
                     k: convert_added_tokens(v, add_type_field=add_type_field)
@@ -860,10 +850,9 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
 
         added_tokens_file = os.path.join(
             save_directory,
-            (filename_prefix + "-" if filename_prefix else "") + ADDED_TOKENS_FILE,
+            (f"{filename_prefix}-" if filename_prefix else "") + ADDED_TOKENS_FILE,
         )
-        added_vocab = self.get_added_vocab()
-        if added_vocab:
+        if added_vocab := self.get_added_vocab():
             with open(added_tokens_file, "w", encoding="utf-8") as f:
                 out_str = json.dumps(added_vocab, ensure_ascii=False)
                 f.write(out_str)
@@ -1015,14 +1004,13 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
         elif padding is not False:
             if padding is True:
                 if verbose:
-                    if max_length is not None:
-                        if max_length is not None and (
-                            truncation is False or truncation == "do_not_truncate"
-                        ):
-                            warnings.warn(
-                                "`max_length` is ignored when `padding`=`True` and there is no truncation strategy. "
-                                "To pad to max length, use `padding='max_length'`."
-                            )
+                    if max_length is not None and (
+                        truncation is False or truncation == "do_not_truncate"
+                    ):
+                        warnings.warn(
+                            "`max_length` is ignored when `padding`=`True` and there is no truncation strategy. "
+                            "To pad to max length, use `padding='max_length'`."
+                        )
                     if old_pad_to_max_length is not False:
                         warnings.warn(
                             "Though `pad_to_max_length` = `True`, it is ignored because `padding`=`True`."
@@ -1032,7 +1020,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                 )  # Default to pad to the longest sequence in the batch
             elif not isinstance(padding, PaddingStrategy):
                 padding_strategy = PaddingStrategy(padding)
-            elif isinstance(padding, PaddingStrategy):
+            else:
                 padding_strategy = padding
         else:
             padding_strategy = PaddingStrategy.DO_NOT_PAD
@@ -1059,7 +1047,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                 )  # Default to truncate the longest sequences in pairs of inputs
             elif not isinstance(truncation, TruncationStrategy):
                 truncation_strategy = TruncationStrategy(truncation)
-            elif isinstance(truncation, TruncationStrategy):
+            else:
                 truncation_strategy = truncation
         else:
             truncation_strategy = TruncationStrategy.DO_NOT_TRUNCATE
@@ -1639,7 +1627,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
 
         batch_outputs = {}
         for i in range(batch_size):
-            inputs = dict((k, v[i]) for k, v in encoded_inputs.items())
+            inputs = {k: v[i] for k, v in encoded_inputs.items()}
             outputs = self._pad(
                 inputs,
                 max_length=max_length,
@@ -1691,9 +1679,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
         Returns:
             :obj:`List[int]`: The model input with special tokens.
         """
-        if token_ids_1 is None:
-            return token_ids_0
-        return token_ids_0 + token_ids_1
+        return token_ids_0 if token_ids_1 is None else token_ids_0 + token_ids_1
 
     def prepare_for_model(
         self,
@@ -1747,7 +1733,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
             **kwargs,
         )
 
-        pair = bool(pair_ids is not None)
+        pair = pair_ids is not None
         len_ids = len(ids)
         len_pair_ids = len(pair_ids) if pair else 0
 
@@ -1841,13 +1827,11 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
         if return_length:
             encoded_inputs["length"] = len(encoded_inputs["input_ids"])
 
-        batch_outputs = BatchEncoding(
+        return BatchEncoding(
             encoded_inputs,
             tensor_type=return_tensors,
             prepend_batch_axis=prepend_batch_axis,
         )
-
-        return batch_outputs
 
     def truncate_sequences(
         self,
@@ -1913,10 +1897,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                     f"but the first sequence has a length {len(ids)}. "
                 )
                 if truncation_strategy == TruncationStrategy.ONLY_FIRST:
-                    error_msg = (
-                        error_msg + "Please select another truncation strategy than "
-                        f"{truncation_strategy}, for instance 'longest_first' or 'only_second'."
-                    )
+                    error_msg = f"{error_msg}Please select another truncation strategy than {truncation_strategy}, for instance 'longest_first' or 'only_second'."
                 logger.error(error_msg)
         elif truncation_strategy == TruncationStrategy.LONGEST_FIRST:
             logger.warning(
@@ -2042,7 +2023,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
                     self.pad_token_id
                 ] * difference + required_input
             else:
-                raise ValueError("Invalid padding strategy:" + str(self.padding_side))
+                raise ValueError(f"Invalid padding strategy:{str(self.padding_side)}")
         elif return_attention_mask and "attention_mask" not in encoded_inputs:
             encoded_inputs["attention_mask"] = [1] * len(required_input)
 
@@ -2170,11 +2151,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
 
         all_special_ids = self.all_special_ids  # cache the property
 
-        special_tokens_mask = [
-            1 if token in all_special_ids else 0 for token in token_ids_0
-        ]
-
-        return special_tokens_mask
+        return [1 if token in all_special_ids else 0 for token in token_ids_0]
 
     @staticmethod
     def clean_up_tokenization(out_string: str) -> str:
@@ -2187,7 +2164,7 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
         Returns:
             :obj:`str`: The cleaned-up string.
         """
-        out_string = (
+        return (
             out_string.replace(" .", ".")
             .replace(" ?", "?")
             .replace(" !", "!")
@@ -2199,7 +2176,6 @@ class TempoPreTrainedTokenizerBase(TempoSpecialTokensMixin, PushToHubMixin):
             .replace(" 've", "'ve")
             .replace(" 're", "'re")
         )
-        return out_string
 
     def _eventual_warn_about_too_long_sequence(
         self, ids: List[int], max_length: Optional[int], verbose: bool

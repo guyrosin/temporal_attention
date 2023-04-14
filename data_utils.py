@@ -107,8 +107,7 @@ def load_train_test_datasets(train_path, test_path, cache_dir):
         split='train',
         cache_dir=cache_dir,
     )
-    dataset = DatasetDict({"train": train_dataset, "validation": test_dataset})
-    return dataset
+    return DatasetDict({"train": train_dataset, "validation": test_dataset})
 
 
 def split_temporal_dataset_files(
@@ -120,7 +119,7 @@ def split_temporal_dataset_files(
     train_path = Path(train_path)
     test_path = Path(test_path)
     dataset_path = get_dataset_path(train_path, corpus_name, train_size, test_size)
-    exclude_similar_sentences = True if corpus_name.startswith("liverpool") else False
+    exclude_similar_sentences = bool(corpus_name.startswith("liverpool"))
     out_train_path = dataset_path / train_path.name
     out_test_path = dataset_path / test_path.name
     if Path(out_train_path).exists() and Path(out_test_path).exists():
@@ -203,7 +202,7 @@ def find_sentences_of_words(
             logger.debug(f"Loading word_time_sentences from {file_path}")
             word_time_sentences = pickle.load(f)
     else:
-        logger.info(f"Finding relevant sentences in the corpus...")
+        logger.info("Finding relevant sentences in the corpus...")
         word_time_sentences = defaultdict(dict)
         for file in text_files:  # For each time period
             time = TemporalText.find_time(file)

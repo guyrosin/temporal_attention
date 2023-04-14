@@ -353,8 +353,8 @@ def load_data(
 
     # DataCollatorForLanguageModeling is more efficient when it receives the `special_tokens_mask`.
     return_special_tokens_mask = True
-    if data_args.line_by_line:
-        tokenized_dataset = tokenize_dataset_line_by_line(
+    return (
+        tokenize_dataset_line_by_line(
             dataset,
             data_args,
             training_args,
@@ -364,8 +364,8 @@ def load_data(
             max_seq_length,
             return_special_tokens_mask,
         )
-    else:
-        tokenized_dataset = tokenize_dataset_concat(
+        if data_args.line_by_line
+        else tokenize_dataset_concat(
             dataset,
             data_args,
             training_args,
@@ -375,7 +375,7 @@ def load_data(
             max_seq_length,
             return_special_tokens_mask,
         )
-    return tokenized_dataset
+    )
 
 
 def train_tempobert():

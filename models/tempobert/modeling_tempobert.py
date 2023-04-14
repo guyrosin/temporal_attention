@@ -77,8 +77,8 @@ class TempoBertEmbeddings(nn.Module):
         if utils.is_time_id_necessary(self.time_embedding_type):
             # time_ids is a range (1, len time emb)
             time_ids = torch.arange(len(self.times)).expand((1, -1))
-            SPECIAL_TIMES_COUNT = 2  # NOTE: hardcoded (see TempoSpecialTokensMixin)
             if "attention" in self.time_embedding_type:
+                SPECIAL_TIMES_COUNT = 2  # NOTE: hardcoded (see TempoSpecialTokensMixin)
                 # NOTE: each time (including "special" times) has a single embedding (for all tokens in the vocabulary)
                 self.time_embeddings = nn.Embedding(
                     SPECIAL_TIMES_COUNT + len(self.times), config.hidden_size
@@ -177,10 +177,7 @@ class BertSelfAttention(nn.Module):
         self.position_embedding_type = getattr(
             config, "position_embedding_type", "absolute"
         )
-        if (
-            self.position_embedding_type == "relative_key"
-            or self.position_embedding_type == "relative_key_query"
-        ):
+        if self.position_embedding_type in {"relative_key", "relative_key_query"}:
             self.max_position_embeddings = config.max_position_embeddings
             self.distance_embedding = nn.Embedding(
                 2 * config.max_position_embeddings - 1, self.attention_head_size
@@ -246,10 +243,7 @@ class BertSelfAttention(nn.Module):
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
 
-        if (
-            self.position_embedding_type == "relative_key"
-            or self.position_embedding_type == "relative_key_query"
-        ):
+        if self.position_embedding_type in ["relative_key", "relative_key_query"]:
             seq_length = hidden_states.size()[1]
             position_ids_l = torch.arange(
                 seq_length, dtype=torch.long, device=hidden_states.device
@@ -480,10 +474,7 @@ class BertAttention(nn.Module):
             output_attentions,
         )
         attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,) + self_outputs[
-            1:
-        ]  # add attentions if we output them
-        return outputs
+        return (attention_output,) + self_outputs[1:]
 
 
 class TemporalAttention(nn.Module):
@@ -541,10 +532,7 @@ class TemporalAttention(nn.Module):
             output_attentions,
         )
         attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,) + self_outputs[
-            1:
-        ]  # add attentions if we output them
-        return outputs
+        return (attention_output,) + self_outputs[1:]
 
 
 class BertIntermediate(nn.Module):
@@ -665,8 +653,7 @@ class BertLayer(nn.Module):
 
     def feed_forward_chunk(self, attention_output):
         intermediate_output = self.intermediate(attention_output)
-        layer_output = self.output(intermediate_output, attention_output)
-        return layer_output
+        return self.output(intermediate_output, attention_output)
 
 
 class BertLayerWithTemporalAttention(nn.Module):
@@ -762,8 +749,7 @@ class BertLayerWithTemporalAttention(nn.Module):
 
     def feed_forward_chunk(self, attention_output):
         intermediate_output = self.intermediate(attention_output)
-        layer_output = self.output(intermediate_output, attention_output)
-        return layer_output
+        return self.output(intermediate_output, attention_output)
 
 
 class BertEncoder(nn.Module):
@@ -846,8 +832,16 @@ class BertEncoder(nn.Module):
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
 
-        if not return_dict:
-            return tuple(
+        return (
+            BaseModelOutputWithPastAndCrossAttentions(
+                last_hidden_state=hidden_states,
+                past_key_values=next_decoder_cache,
+                hidden_states=all_hidden_states,
+                attentions=all_self_attentions,
+                cross_attentions=all_cross_attentions,
+            )
+            if return_dict
+            else tuple(
                 v
                 for v in [
                     hidden_states,
@@ -858,12 +852,6 @@ class BertEncoder(nn.Module):
                 ]
                 if v is not None
             )
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            past_key_values=next_decoder_cache,
-            hidden_states=all_hidden_states,
-            attentions=all_self_attentions,
-            cross_attentions=all_cross_attentions,
         )
 
 
@@ -954,8 +942,16 @@ class BertEncoderWithTemporalAttention(nn.Module):
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
 
-        if not return_dict:
-            return tuple(
+        return (
+            BaseModelOutputWithPastAndCrossAttentions(
+                last_hidden_state=hidden_states,
+                past_key_values=next_decoder_cache,
+                hidden_states=all_hidden_states,
+                attentions=all_self_attentions,
+                cross_attentions=all_cross_attentions,
+            )
+            if return_dict
+            else tuple(
                 v
                 for v in [
                     hidden_states,
@@ -966,12 +962,6 @@ class BertEncoderWithTemporalAttention(nn.Module):
                 ]
                 if v is not None
             )
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            past_key_values=next_decoder_cache,
-            hidden_states=all_hidden_states,
-            attentions=all_self_attentions,
-            cross_attentions=all_cross_attentions,
         )
 
 
@@ -1033,8 +1023,7 @@ class BertOnlyMLMHead(nn.Module):
         self.predictions = BertLMPredictionHead(config)
 
     def forward(self, sequence_output):
-        prediction_scores = self.predictions(sequence_output)
-        return prediction_scores
+        return self.predictions(sequence_output)
 
 
 class TempoBertPreTrainedModel(PreTrainedModel):
@@ -1277,16 +1266,17 @@ class TempoBertModel(TempoBertPreTrainedModel):
             self.pooler(sequence_output) if self.pooler is not None else None
         )
 
-        if not return_dict:
-            return (sequence_output, pooled_output) + encoder_outputs[1:]
-
-        return BaseModelOutputWithPoolingAndCrossAttentions(
-            last_hidden_state=sequence_output,
-            pooler_output=pooled_output,
-            past_key_values=encoder_outputs.past_key_values,
-            hidden_states=encoder_outputs.hidden_states,
-            attentions=encoder_outputs.attentions,
-            cross_attentions=encoder_outputs.cross_attentions,
+        return (
+            BaseModelOutputWithPoolingAndCrossAttentions(
+                last_hidden_state=sequence_output,
+                pooler_output=pooled_output,
+                past_key_values=encoder_outputs.past_key_values,
+                hidden_states=encoder_outputs.hidden_states,
+                attentions=encoder_outputs.attentions,
+                cross_attentions=encoder_outputs.cross_attentions,
+            )
+            if return_dict
+            else (sequence_output, pooled_output) + encoder_outputs[1:]
         )
 
 
