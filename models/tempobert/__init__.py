@@ -3,20 +3,16 @@ from typing import TYPE_CHECKING
 from transformers.file_utils import _LazyModule
 
 _import_structure = {
-    "configuration_tempobert": [
-        "TempoBertConfig",
+    "configuration_tempobert": ["TempoBertConfig"],
+    "tokenization_tempobert_fast": ["TempoBertTokenizerFast"],
+    "modeling_tempobert": [
+        "TempoBertForMaskedLM",
+        "TempoBertModel",
+        "TempoBertForPreTraining",
+        "TempoBertForSequenceClassification",
+        "TempoBertForTokenClassification",
     ],
 }
-
-_import_structure["tokenization_tempobert_fast"] = ["TempoBertTokenizerFast"]
-
-_import_structure["modeling_tempobert"] = [
-    "TempoBertForMaskedLM",
-    "TempoBertModel",
-    "TempoBertForPreTraining",
-    "TempoBertForSequenceClassification",
-    "TempoBertForTokenClassification",
-]
 
 if TYPE_CHECKING:
     from .configuration_tempobert import TempoBertConfig

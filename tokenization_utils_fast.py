@@ -67,11 +67,10 @@ def prepend(texts, time_ids, stringify_time_id=noop):
 
 def prepend_tuples(text_pairs, time_id_pairs, stringify_time_id=noop):
     """Prepend the time to each text, where the inputs are pairs"""
-    texts = [
+    return [
         prepend(text_pair, time_id_pair, stringify_time_id)
         for text_pair, time_id_pair in zip(text_pairs, time_id_pairs)
     ]
-    return texts
 
 
 MODEL_TO_TRAINER_MAPPING = {
@@ -134,7 +133,7 @@ class TempoPreTrainedTokenizerFast(TempoPreTrainedTokenizerBase):
         self._tokenizer = fast_tokenizer
 
         if slow_tokenizer is not None:
-            kwargs.update(slow_tokenizer.init_kwargs)
+            kwargs |= slow_tokenizer.init_kwargs
 
         # We call this after having initialized the backend tokenizer because we update it.
         super().__init__(**kwargs)
@@ -166,10 +165,11 @@ class TempoPreTrainedTokenizerFast(TempoPreTrainedTokenizerBase):
         """
         base_vocab = self._tokenizer.get_vocab(with_added_tokens=False)
         full_vocab = self._tokenizer.get_vocab(with_added_tokens=True)
-        added_vocab = dict(
-            (tok, index) for tok, index in full_vocab.items() if tok not in base_vocab
-        )
-        return added_vocab
+        return {
+            tok: index
+            for tok, index in full_vocab.items()
+            if tok not in base_vocab
+        }
 
     def __len__(self) -> int:
         """
@@ -262,19 +262,14 @@ class TempoPreTrainedTokenizerFast(TempoPreTrainedTokenizerBase):
         if isinstance(tokens, str):
             return self._convert_token_to_id_with_added_voc(tokens)
 
-        ids = []
-        for token in tokens:
-            ids.append(self._convert_token_to_id_with_added_voc(token))
-        return ids
+        return [self._convert_token_to_id_with_added_voc(token) for token in tokens]
 
     def _convert_token_to_id_with_added_voc(self, token: str) -> int:
         index = self._tokenizer.token_to_id(token)
-        if index is None:
-            return self.unk_token_id
-        return index
+        return self.unk_token_id if index is None else index
 
     def _convert_id_to_token(self, index: int) -> Optional[str]:
-        return self._tokenizer.id_to_token(int(index))
+        return self._tokenizer.id_to_token(index)
 
     def _add_tokens(
         self, new_tokens: List[Union[str, AddedToken]], special_tokens=False
@@ -470,14 +465,14 @@ class TempoPreTrainedTokenizerFast(TempoPreTrainedTokenizerBase):
                 time_id = batch_time_id[seq_i]
                 encoding.time_ids = (
                     [
-                        self.time_to_id[time_id]
+                        self.time_to_id[time_id[sequence_id]]
                         if sequence_id is not None
                         else self.pad_time_id
                         for sequence_id in encoding.sequence_ids
                     ]
-                    if not isinstance(time_id, tuple)
+                    if isinstance(time_id, tuple)
                     else [
-                        self.time_to_id[time_id[sequence_id]]
+                        self.time_to_id[time_id]
                         if sequence_id is not None
                         else self.pad_time_id
                         for sequence_id in encoding.sequence_ids
@@ -624,8 +619,7 @@ class TempoPreTrainedTokenizerFast(TempoPreTrainedTokenizerBase):
         )
 
         if clean_up_tokenization_spaces:
-            clean_text = self.clean_up_tokenization(text)
-            return clean_text
+            return self.clean_up_tokenization(text)
         else:
             return text
 
@@ -658,10 +652,10 @@ class TempoPreTrainedTokenizerFast(TempoPreTrainedTokenizerBase):
         if save_slow:
             added_tokens_file = os.path.join(
                 save_directory,
-                (filename_prefix + "-" if filename_prefix else "") + ADDED_TOKENS_FILE,
+                (f"{filename_prefix}-" if filename_prefix else "")
+                + ADDED_TOKENS_FILE,
             )
-            added_vocab = self.get_added_vocab()
-            if added_vocab:
+            if added_vocab := self.get_added_vocab():
                 with open(added_tokens_file, "w", encoding="utf-8") as f:
                     out_str = json.dumps(added_vocab, ensure_ascii=False)
                     f.write(out_str)
@@ -674,7 +668,8 @@ class TempoPreTrainedTokenizerFast(TempoPreTrainedTokenizerBase):
         if save_fast:
             tokenizer_file = os.path.join(
                 save_directory,
-                (filename_prefix + "-" if filename_prefix else "") + TOKENIZER_FILE,
+                (f"{filename_prefix}-" if filename_prefix else "")
+                + TOKENIZER_FILE,
             )
             self.backend_tokenizer.save(tokenizer_file)
             file_names = file_names + (tokenizer_file,)

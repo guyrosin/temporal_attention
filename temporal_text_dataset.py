@@ -44,10 +44,8 @@ class TemporalText(datasets.ArrowBasedBuilder):
         m = re.match(r".*?_(\d+.*?)[\.a-zA-Z]", filename)
         if m is None:
             return None
-        time = m.group(1)
-        # Remove trailing underscores (e.g., for "nyt_2017_train.txt")
-        time = time.strip("_")
-        return time
+        time = m[1]
+        return time.strip("_")
 
     def _generate_tables(self, files):
         for file_idx, file in enumerate(files):

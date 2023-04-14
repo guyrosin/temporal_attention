@@ -84,18 +84,15 @@ def get_embedding(
     require_word_in_vocab=False,
     hidden_layers_number=None,
 ):
-    if (require_word_in_vocab and not word in model.tokenizer.vocab) or len(
-        sentences
-    ) == 0:
+    if (
+        require_word_in_vocab
+        and word not in model.tokenizer.vocab
+        or len(sentences) == 0
+    ):
         return torch.tensor([])
     if hidden_layers_number is None:
         num_hidden_layers = model.config.num_hidden_layers
-        if num_hidden_layers == 12:
-            hidden_layers_number = 1
-        elif num_hidden_layers == 2:
-            hidden_layers_number = 3
-        else:
-            hidden_layers_number = 1
+        hidden_layers_number = 3 if num_hidden_layers == 2 else 1
     embs = model.embed_word(
         sentences,
         word,
@@ -103,12 +100,7 @@ def get_embedding(
         batch_size=batch_size,
         hidden_layers_number=hidden_layers_number,
     )
-    if embs.ndim == 1:
-        #  in case of a single sentence, embs is actually the single embedding, not a list
-        return embs
-    else:
-        centroid = torch.mean(embs, dim=0)
-        return centroid
+    return embs if embs.ndim == 1 else torch.mean(embs, dim=0)
 
 
 def get_detection_function(score_method, config):
@@ -173,10 +165,11 @@ def semantic_change_detection_wrapper(
                 if not sentences:
                     logger.debug(f"Found no sentences for '{word}' at time '{time}'")
             if hasattr(model.config, 'times'):
-                missing_times = [
-                    time for time in model.config.times if time not in time_sentences
-                ]
-                if missing_times:
+                if missing_times := [
+                    time
+                    for time in model.config.times
+                    if time not in time_sentences
+                ]:
                     logger.debug(f"Found no sentences for '{word}' at {missing_times}")
             score = detection_function(
                 time_sentences,
@@ -195,14 +188,14 @@ def semantic_change_detection_wrapper(
             shifts_dict,
         )
     logger.info("Final results:")
-    for model, result_str in model_to_result_str.items():
+    for result_str in model_to_result_str.values():
         logger.info(result_str)
 
 
 def check_words_in_vocab(words, tokenizer, verbose=False, check_split_words=False):
     missing_words = []
     for word in words:
-        if not word in tokenizer.vocab:
+        if word not in tokenizer.vocab:
             if verbose:
                 logger.warning(f"{word=} doesn't exist in the vocab")
             missing_words.append(word)
@@ -243,8 +236,7 @@ def semantic_change_detection(
         method = calc_change_score_cosine_dist
     else:
         raise ValueError(f"Unknown {score_method=}")
-    score = method(model, sentences, word, verbose)
-    return score
+    return method(model, sentences, word, verbose)
 
 
 def semantic_change_detection_temporal(
@@ -328,9 +320,7 @@ def get_shifts(corpus_name, tokenizer=None):
             # The German target words are uppercased
             if tokenizer.do_lower_case:
                 df_shifts.word = df_shifts.word.str.lower()
-        elif corpus_name.startswith("semeval_lat"):
-            pass
-        else:
+        elif not corpus_name.startswith("semeval_lat"):
             logger.error(f"Unsupported corpus: {corpus_name}")
             exit()
         shifts_dict = dict(zip(df_shifts.word, df_shifts.score))

@@ -69,11 +69,10 @@ def _load_auto_config(model_args, data_args=None, num_labels=None, **kwargs):
         if num_labels
         else {}
     )
-    kwargs.update(additional_kwargs)
-    config = AutoConfig.from_pretrained(
+    kwargs |= additional_kwargs
+    return AutoConfig.from_pretrained(
         model_args.model_name_or_path, cache_dir=model_args.cache_dir, **kwargs
     )
-    return config
 
 
 def load_pretrained_model(
@@ -299,8 +298,10 @@ def init_run(
         logger.add(sys.stderr, level="WARNING")
     utils.set_result_logger_level()
     logger.warning(
-        f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}, "
-        + f"distributed training: {bool(training_args.local_rank != -1)}"
+        (
+            f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}, "
+            + f"distributed training: {training_args.local_rank != -1}"
+        )
     )
     for args_instance in (model_args, data_args, training_args):
         logger.info(args_instance)
@@ -345,7 +346,7 @@ def get_model_name(model_name_or_path):
         if "checkpoint-" in path.name:
             model_name_or_path = f"{path.parent.name}/{path.name}"
         else:
-            model_name_or_path = str(path.name)
+            model_name_or_path = path.name
     return model_name_or_path
 
 
